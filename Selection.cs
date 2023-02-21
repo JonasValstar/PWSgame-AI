@@ -1,3 +1,4 @@
+using System.Reflection;
 using UnityEngine;
 using TMPro;
 using UnityEngine.SceneManagement;
@@ -9,34 +10,49 @@ public class Selection : MonoBehaviour
     public Animator turnAnimatorDark;
     public Animator turnAnimatorLight;
 
+    // ai auto-play
+    public int storedTurn = 1;
+    public bool gameWon = false;
+
     // score
-    public int lightScore = 0;
-    public int darkScore = 0;
-    public TMP_Text scoreLight;
-    public TMP_Text scoreDark;
-    public GameObject lightWins;
-    public GameObject darkWins;
+    public GameObject lightWinText;
+    public GameObject DarkWinText;
+    bool won = false;
 
     // total pieces
     public int totalLight = 8;
     public int totalDark = 8;
+    public int lightZeta = 0;
+    public int lightEta = 0;
+    public int lightTheta = 0;
+    public int darkZeta = 0;
+    public int darkEta = 0;
+    public int darkTheta = 0;
+    public TMP_Text lightZetaText;
+    public TMP_Text lightEtaText;
+    public TMP_Text lightThetaText;
+    public TMP_Text darkZetaText;
+    public TMP_Text darkEtaText;
+    public TMP_Text darkThetaText;
     GameObject[] scoringPieces;
 
-    // undo
-    public GameObject targetPiece;
-    public GameObject DestroyedPiece;
-    public Vector3 oldPosition;
+    // rule menu and choose menu
+    public GameObject ruleMenu;
+    public GameObject chooseMenu;
 
     // rest
     public bool somethingSelected;
     public Transform selectedTransform;
     public AI ai;
 
-
-    // Start is called before the first frame update
     void Start()
     {
-        
+        if (PlayerPrefs.HasKey("playMode") == false) {
+            PlayerPrefs.SetInt("playMode", 1);
+        }
+        if (PlayerPrefs.HasKey("aiTurn") == false) {
+            PlayerPrefs.SetInt("aiTurn", 0);
+        }
     }
 
     // Update is called once per frame
@@ -46,50 +62,65 @@ public class Selection : MonoBehaviour
             ai.InvokeAI();
         }
 
-        if (Input.GetMouseButtonDown(0)) {
-            Vector2 raycastPosition = Camera.main.ScreenToWorldPoint(Input.mousePosition);
-            RaycastHit2D hit = Physics2D.Raycast(raycastPosition, Vector2.zero);
-
-            if (hit.collider != null) {
-                if (hit.collider.tag == "Piece Light" || hit.collider.tag == "Piece Dark") {
-                    if ((hit.collider.tag == "Piece Light" && turn == 1) || (hit.collider.tag == "Piece Dark" && turn == -1))
-                    if (hit.collider.gameObject.GetComponent<Piece>().isSelected != true) {
-                        hit.collider.gameObject.GetComponent<Piece>().isSelected = true;
-                    } else {
-                        hit.collider.gameObject.GetComponent<Piece>().isSelected = false;
-                    }
-                } else if (hit.collider.tag == "Movement Thing") {
-                    hit.collider.gameObject.GetComponent<Mover>().isSelected = true;
-                    ChangeTurn();
+        if (PlayerPrefs.GetInt("playMode") == 3) { // checks if AI vs AI is selected
+            if (gameWon == false) {
+                if (turn == storedTurn) {
+                    storedTurn = storedTurn * -1;
+                    ai.InvokeAI();
                 }
             }
-            
+        } else {
+            if (PlayerPrefs.GetInt("playMode") == 2) {
+                if (turn == storedTurn) {
+                    storedTurn = storedTurn * -1;
+                    if (turn == PlayerPrefs.GetInt("aiTurn")) {
+                        ai.InvokeAI();
+                    }
+                }
+                
+            }
+
+
+            if (Input.GetMouseButtonDown(0)) {
+                Vector2 raycastPosition = Camera.main.ScreenToWorldPoint(Input.mousePosition);
+                RaycastHit2D hit = Physics2D.Raycast(raycastPosition, Vector2.zero);
+
+                if (hit.collider != null) {
+                    if (hit.collider.tag == "Piece Light" || hit.collider.tag == "Piece Dark") {
+                        if ((hit.collider.tag == "Piece Light" && turn == 1) || (hit.collider.tag == "Piece Dark" && turn == -1))
+                        if (hit.collider.gameObject.GetComponent<Piece>().isSelected != true) {
+                            hit.collider.gameObject.GetComponent<Piece>().isSelected = true;
+                        } else {
+                            hit.collider.gameObject.GetComponent<Piece>().isSelected = false;
+                        }
+                    } else if (hit.collider.tag == "Movement Thing") {
+                        hit.collider.gameObject.GetComponent<Mover>().isSelected = true;
+                        ChangeTurn();
+                    }
+                }
+            }
         }
+        
+        
 
-        if (totalDark == 0) {
-            //! Light wins
-            //? something with this code
-            
-            scoringPieces = GameObject.FindGameObjectsWithTag("Piece Light");
-            foreach (GameObject piece in scoringPieces) {
-                piece.GetComponent<Piece>().ScorePiece(piece.transform.position);
-            }
-            totalDark = -1;
-            totalLight = -1;
-        } else if (totalLight == 0) {
-            //! Dark wins
-            //? something with this code
-
-            scoringPieces = GameObject.FindGameObjectsWithTag("Piece Dark");
-            foreach (GameObject piece in scoringPieces) {
-                piece.GetComponent<Piece>().ScorePiece(piece.transform.position);
-            }
-            totalDark = -1;
-            totalLight = -1;
+        // check for win
+        if (totalDark == 0 && won == false) { // light wins
+            WinGame(true);
+            won = true;
+        } else if (totalLight == 0 && won == true) { // Dark wins
+            WinGame(false);
+            won = true;
         }
     }
 
-    //TODO - add animation for turn change and indicator
+    public void OpenRuleMenu() {
+        if (ruleMenu.activeSelf == false) {
+            ruleMenu.SetActive(true);
+        } else {
+            ruleMenu.SetActive(false);
+        }
+        
+    }
 
     public void ChangeTurn() {
         turn = turn * -1;
@@ -103,22 +134,63 @@ public class Selection : MonoBehaviour
         }
     }
 
-    public void AddScore(bool lightPiece) 
+    public void Restart()
     {
-        if (lightPiece == true) {
-            scoreLight.text = lightScore.ToString();
+        SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+    }
+
+    public void WinGame(bool light) 
+    {
+        gameWon = true;
+        // deleting all pieces from board
+        foreach(GameObject piece in GameObject.FindGameObjectsWithTag("Piece Light")) {
+            piece.GetComponent<Piece>().DeletePieceBecauseWon();
+        }
+        foreach(GameObject piece in GameObject.FindGameObjectsWithTag("Piece Dark")) {
+            piece.GetComponent<Piece>().DeletePieceBecauseWon();
+        }
+
+        // make win active
+        if (light == true) { // light has won
+            turnAnimatorDark.SetTrigger("Disappear");
+            lightWinText.SetActive(true);
         } else {
-            scoreDark.text = darkScore.ToString();
+            turnAnimatorLight.SetTrigger("Disappear");
+            DarkWinText.SetActive(true);
+            
         }
     }
 
-    public void EndGame()
+    public void changePlayMode(int mode) 
     {
-        
+        PlayerPrefs.SetInt("playMode", mode);
+        if (mode != 2) {
+            Restart();
+        }
     }
 
-    public void Restart()
+    public void SetAiTurn(int turn) {
+        PlayerPrefs.SetInt("aiTurn", turn);
+    }
+
+    public void OpenChooseMenu(bool open) {
+        chooseMenu.SetActive(open);
+        if (open == false) {
+            Restart();
+        }
+    }
+
+    public void UpdateCaptureTexts()
     {
-        SceneManager.LoadScene("Standard pvp");
+        lightZetaText.text = " " + lightZeta.ToString();
+        lightEtaText.text = " " + lightEta.ToString();
+        lightThetaText.text = " " + lightTheta.ToString();
+        darkZetaText.text = " " + darkZeta.ToString();
+        darkEtaText.text = " " + darkEta.ToString();
+        darkThetaText.text = " " + darkTheta.ToString();
+    }
+
+    public void ExitGame() {
+        Application.Quit();
     }
 }

@@ -89,13 +89,20 @@ public class Piece : MonoBehaviour
             GameObject.Destroy(child.gameObject);
         }
         animator.SetTrigger("Disappear");
-        if (transform.tag == "Piece Light") {
-            // win game Light
-        } else {
-            // win game Dark
+        if (transform.tag == "Piece Light") { // Light wins
+             selection.WinGame(true);
+        } else { // Dark wins
+            selection.WinGame(false);
         }
         selection.somethingSelected = false;
     }
+
+    public void DeletePieceBecauseWon() 
+    {
+        animator.SetTrigger("Disappear");
+        selection.somethingSelected = false;
+    }
+
 
     public void DeletePiece() {
         Destroy(gameObject);

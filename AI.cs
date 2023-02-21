@@ -55,11 +55,6 @@ public class AI : MonoBehaviour
                                                                 3 == ATK Dark
                                                                 4 == DEF Dark
                                                                 5 == ALL Dark */ 
-
-    void WinGame(Vector3 oldLocation, Vector3 newLocation)
-    {
-        //! do something that stops AI script and moves piece to win game
-    }
     
     void getPossibleMoves(List<Vector3> Positions, List<int> Types, int currentDepth) 
     {
@@ -73,6 +68,7 @@ public class AI : MonoBehaviour
             foreach(Vector3 move in piecePrefabs[Types[i]].GetComponent<Piece>().pieceSO.MoveLocations) { // gets all possible moves a piece can make
                 Vector3 newLocation = new Vector3(Positions[i].x + move.x, Positions[i].y + move.y, -1); // get the new location
                 if ((newLocation.y > 40 && piecePrefabs[Types[i]].tag == "Piece Light") || (newLocation.y < -40 && piecePrefabs[Types[i]].tag == "Piece Dark")) { // check to see if move is legal
+                    //! error in code on line 72 (index is negative or bigger than list)
                     R_winFM.Add(new int[firstMove[i], currentDepth]); // adds FM and depth to list
                 } else if(newLocation.x < 20 && newLocation.x > -20 && newLocation.y < 40 && newLocation.y > -40 && Positions.Contains(newLocation) == false) {
                     R_oldPos.Add(Positions[i]); 
@@ -160,18 +156,8 @@ public class AI : MonoBehaviour
         }
     }
 
-    /* void CheckNeighbors(float xPos, float yPos, int i) 
-    {
-        List<Vector3> returnList = new List<Vector3>();
-        if () {
-
-        }
-    } */
-
     public void InvokeAI() 
     {
-        Debug.Log("AI initiated l4");
-
         // booleans
         bool moveCheckedAndOk = true;
         bool foundEnemy = false;
@@ -188,6 +174,9 @@ public class AI : MonoBehaviour
         List<int> diffCurrentPositionsType = new List<int>();
         List<bool> turned = new List<bool>();
         List<int> freePieceMove = new List<int>();
+
+        // back-up lists for bad moves
+        List<int> BadMoves = new List<int>();
 
         // for calculating
         float totalPieceValue = new float();
@@ -240,8 +229,12 @@ public class AI : MonoBehaviour
         for (int i = 0; i < currentPositions.Count; i++) { // loops through every piece
             foreach(Vector3 move in piecePrefabs[currentPositionsType[i]].GetComponent<Piece>().pieceSO.MoveLocations) { // gets all possible moves a piece can make
                 Vector3 newLocation = new Vector3(currentPositions[i].x + move.x, currentPositions[i].y + move.y, -1); // get the new location
-                if ((newLocation.y > 40 && piecePrefabs[currentPositionsType[i]].tag == "Piece Light") || (newLocation.y < -40 && piecePrefabs[currentPositionsType[i]].tag == "Piece Dark")) { // check to see if move is legal
-                    WinGame(currentPositions[i], newLocation); // winning move is played, more calculations unnecessary //! doesn't work yet
+                if ((newLocation.y > 40 && piecePrefabs[currentPositionsType[i]].tag == "Piece Light")) { // check to see if AI can win as Light
+                    gameObject.GetComponent<Selection>().WinGame(true); // winning game
+                    freePieceMove.Add(-1); // setting to -1 to stop AI from calculating further
+                } else if ((newLocation.y < -40 && piecePrefabs[currentPositionsType[i]].tag == "Piece Dark")) { // check to see if AI can win as Dark
+                    gameObject.GetComponent<Selection>().WinGame(false); // winning game
+                    freePieceMove.Add(-1); // setting to -1 to stop AI from calculating further
                 } else if(newLocation.x < 20 && newLocation.x > -20 && newLocation.y < 40 && newLocation.y > -40 && currentPositions.Contains(newLocation) == false) {
                     // remember first moves
                     FM_oldPosition.Add(currentPositions[i]); 
@@ -260,14 +253,12 @@ public class AI : MonoBehaviour
                     foreach(Vector3 move in piecePrefabs[currentPositionsType[currentPositions.IndexOf(FM_newPosition[i] + surroundingTiles[p])]].GetComponent<Piece>().pieceSO.MoveLocations) { // gather all possible moves for surrounding piece
                         if (surroundingTiles[p].x == -move.x && surroundingTiles[p].y == -move.y) { // check if ally is able to cover piece
                             foundAlly = true;
-                            Debug.Log(i +": " + FM_oldPosition[i] + " " + FM_newPosition[i] + " | "+ p +" l3 " + surroundingTiles[p]);
                         }
                     }
                 } else if(diffCurrentPositions.Contains(FM_newPosition[i] + surroundingTiles[p])) { // checks if enemy is present
                     foreach(Vector3 move in piecePrefabs[diffCurrentPositionsType[diffCurrentPositions.IndexOf(FM_newPosition[i] + surroundingTiles[p])]].GetComponent<Piece>().pieceSO.MoveLocations) { // gather all possible moves for surrounding piece
                         if (surroundingTiles[p].x == -move.x && surroundingTiles[p].y == -move.y) { // check is enemy is able to attack piece
                             foundEnemy = true;
-                            Debug.Log(i +": " + FM_oldPosition[i] + " " + FM_newPosition[i] + " | "+ p +" l4 " + surroundingTiles[p]);
                         }
                     }
                 }
@@ -294,7 +285,6 @@ public class AI : MonoBehaviour
                     }
                 }
                 if (freePiece == true) {
-                    Debug.Log("1");
                     freePieceMove.Add(i);
                 }
             }
@@ -329,6 +319,8 @@ public class AI : MonoBehaviour
                 boardLayoutDiff.Add(diffPositions); // adds enemy positions to list
                 boardTypeDiff.Add(diffPositionsType); // adds enemy types to list
                 firstMove.Add(i); // adds first move to list
+            } else {
+                BadMoves.Add(i);
             }
 
             moveCheckedAndOk = true;
@@ -340,7 +332,6 @@ public class AI : MonoBehaviour
         // looping until depth reached
         if (freePieceMove.Count == 0) {
             for (int currentDepth = 1; currentDepth < Depth; currentDepth++) {
-                Debug.Log("Depth: " + currentDepth);
                 if (currentDepth%2 == 0) { // AI's turn
                     for (int i = 0; i < boardLayout.Count; i++) { // loops through every board configuration
                         getPossibleMoves(boardLayout[i], boardType[i], currentDepth);
@@ -516,13 +507,36 @@ public class AI : MonoBehaviour
             }
 
             int choice;
-            choice = firstMove[bestScoreIndex[Random.Range(0, bestScoreIndex.Count)]];
+
+            // check if any good moves are even found
+            if (firstMove.Count > 0) { // yes
+                choice = firstMove[bestScoreIndex[Random.Range(0, bestScoreIndex.Count)]]; // pick a good move
+            } else { // no
+                choice = BadMoves[bestScoreIndex[Random.Range(0, BadMoves.Count)]]; // pick a bad move
+            }
+            
             if (gameObject.GetComponent<Selection>().turn == 1) { // Light's turn
                 foreach (GameObject piece in GameObject.FindGameObjectsWithTag("Piece Light")) {
                     if (piece.transform.position == FM_oldPosition[choice]) {
                         piece.transform.Translate(FM_newPosition[choice] - piece.transform.position);
                         foreach (GameObject diffPiece in GameObject.FindGameObjectsWithTag("Piece Dark")) {
                             if (diffPiece.transform.position == piece.transform.position) {
+                                switch(diffPiece.gameObject.GetComponent<Piece>().type) {
+                                    case 3:
+                                    Debug.Log("0");
+                                        gameObject.GetComponent<Selection>().darkZeta++;
+                                        break;
+                                    case 4:
+                                    Debug.Log("1");
+                                        gameObject.GetComponent<Selection>().darkEta++;
+                                        break;
+                                    case 5:
+                                    Debug.Log("2");
+                                        gameObject.GetComponent<Selection>().darkTheta++;
+                                        break;
+                                }
+                                gameObject.GetComponent<Selection>().totalLight -= 1;
+                                gameObject.GetComponent<Selection>().UpdateCaptureTexts();
                                 GameObject.Destroy(diffPiece);
                                 gameObject.GetComponent<Selection>().somethingSelected = false;
                             }
@@ -535,6 +549,22 @@ public class AI : MonoBehaviour
                         piece.transform.Translate(FM_newPosition[choice] - piece.transform.position);
                         foreach (GameObject diffPiece in GameObject.FindGameObjectsWithTag("Piece Light")) {
                             if (diffPiece.transform.position == piece.transform.position) {
+                                switch(diffPiece.gameObject.GetComponent<Piece>().type) {
+                                    case 0:
+                                    Debug.Log("3");
+                                        gameObject.GetComponent<Selection>().lightZeta++;
+                                        break;
+                                    case 1:
+                                    Debug.Log("4");
+                                        gameObject.GetComponent<Selection>().lightEta++;
+                                        break;
+                                    case 2:
+                                    Debug.Log("5");
+                                        gameObject.GetComponent<Selection>().lightTheta++;
+                                        break;
+                                }
+                                gameObject.GetComponent<Selection>().totalDark -= 1;
+                                gameObject.GetComponent<Selection>().UpdateCaptureTexts();
                                 GameObject.Destroy(diffPiece);
                                 gameObject.GetComponent<Selection>().somethingSelected = false;
                             }
@@ -543,26 +573,54 @@ public class AI : MonoBehaviour
                 }
             }
         } else { // free piece can be taken
-            if (gameObject.GetComponent<Selection>().turn == 1) { // Light's turn
-                foreach (GameObject piece in GameObject.FindGameObjectsWithTag("Piece Light")) {
-                    if (piece.transform.position == FM_oldPosition[freePieceMove[0]]) {
-                        piece.transform.Translate(FM_newPosition[freePieceMove[0]] - piece.transform.position);
-                        foreach (GameObject diffPiece in GameObject.FindGameObjectsWithTag("Piece Dark")) {
-                            if (diffPiece.transform.position == piece.transform.position) {
-                                GameObject.Destroy(diffPiece);
-                                gameObject.GetComponent<Selection>().somethingSelected = false;
+            if (freePieceMove[0] != -1) {
+                if (gameObject.GetComponent<Selection>().turn == 1) { // Light's turn
+                    foreach (GameObject piece in GameObject.FindGameObjectsWithTag("Piece Light")) {
+                        if (piece.transform.position == FM_oldPosition[freePieceMove[0]]) {
+                            piece.transform.Translate(FM_newPosition[freePieceMove[0]] - piece.transform.position);
+                            foreach (GameObject diffPiece in GameObject.FindGameObjectsWithTag("Piece Dark")) {
+                                if (diffPiece.transform.position == piece.transform.position) {
+                                    switch(diffPiece.gameObject.GetComponent<Piece>().type) {
+                                        case 3:
+                                            gameObject.GetComponent<Selection>().darkZeta++;
+                                            break;
+                                        case 4:
+                                            gameObject.GetComponent<Selection>().darkEta++;
+                                            break;
+                                        case 5:
+                                            gameObject.GetComponent<Selection>().darkTheta++;
+                                            break;
+                                    }
+                                    gameObject.GetComponent<Selection>().totalLight -= 1;
+                                    gameObject.GetComponent<Selection>().UpdateCaptureTexts();
+                                    GameObject.Destroy(diffPiece);
+                                    gameObject.GetComponent<Selection>().somethingSelected = false;
+                                }
                             }
                         }
                     }
-                }
-            } else {
-                foreach (GameObject piece in GameObject.FindGameObjectsWithTag("Piece Dark")) {
-                    if (piece.transform.position == FM_oldPosition[freePieceMove[0]]) {
-                        piece.transform.Translate(FM_newPosition[freePieceMove[0]] - piece.transform.position);
-                        foreach (GameObject diffPiece in GameObject.FindGameObjectsWithTag("Piece Light")) {
-                            if (diffPiece.transform.position == piece.transform.position) {
-                                GameObject.Destroy(diffPiece);
-                                gameObject.GetComponent<Selection>().somethingSelected = false;
+                } else {
+                    foreach (GameObject piece in GameObject.FindGameObjectsWithTag("Piece Dark")) {
+                        if (piece.transform.position == FM_oldPosition[freePieceMove[0]]) {
+                            piece.transform.Translate(FM_newPosition[freePieceMove[0]] - piece.transform.position);
+                            foreach (GameObject diffPiece in GameObject.FindGameObjectsWithTag("Piece Light")) {
+                                if (diffPiece.transform.position == piece.transform.position) {
+                                    switch(diffPiece.gameObject.GetComponent<Piece>().type) {
+                                        case 0:
+                                            gameObject.GetComponent<Selection>().lightZeta++;
+                                            break;
+                                        case 1:
+                                            gameObject.GetComponent<Selection>().lightEta++;
+                                            break;
+                                        case 2:
+                                            gameObject.GetComponent<Selection>().lightTheta++;
+                                            break;
+                                    }
+                                    gameObject.GetComponent<Selection>().totalDark -= 1;
+                                    gameObject.GetComponent<Selection>().UpdateCaptureTexts();
+                                    GameObject.Destroy(diffPiece);
+                                    gameObject.GetComponent<Selection>().somethingSelected = false;
+                                }
                             }
                         }
                     }

@@ -43,10 +43,35 @@ public class Mover : MonoBehaviour
                 pieceScript.isSelected = false;
                 if (name == "Deletion") {
                     if (toBeDeletedPiece.transform.tag == "Piece Light") {
+                        Debug.Log("1" + toBeDeletedPiece.gameObject.GetComponent<Piece>().type);
+                        switch(toBeDeletedPiece.gameObject.GetComponent<Piece>().type) {
+                            case 0:
+                                selection.lightZeta++;
+                                break;
+                            case 1:
+                                selection.lightEta++;
+                                break;
+                            case 2:
+                                selection.lightTheta++;
+                                break;
+                        }
                         selection.totalLight -= 1;
                     } else {
+                        Debug.Log("2" + toBeDeletedPiece.gameObject.GetComponent<Piece>().type);
+                        switch(toBeDeletedPiece.gameObject.GetComponent<Piece>().type) {
+                            case 3:
+                                selection.darkZeta++;
+                                break;
+                            case 4:
+                                selection.darkEta++;
+                                break;
+                            case 5:
+                                selection.darkTheta++;
+                                break;
+                        }
                         selection.totalDark -= 1;
                     }
+                    selection.UpdateCaptureTexts();
                     Destroy(toBeDeletedPiece);
                 }
                 pieceScript.MovePiece(movePosition);
